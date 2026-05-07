@@ -15,6 +15,9 @@ pub fn install(app: &mut App) -> tauri::Result<()> {
     let open = MenuItemBuilder::with_id("file:open", "Open...")
         .accelerator("CmdOrCtrl+O")
         .build(app)?;
+    let open_recent = MenuItemBuilder::with_id("file:open-recent", "Open Recent...")
+        .accelerator("CmdOrCtrl+Alt+O")
+        .build(app)?;
     let save = MenuItemBuilder::with_id("file:save", "Save")
         .accelerator("CmdOrCtrl+S")
         .build(app)?;
@@ -78,6 +81,7 @@ pub fn install(app: &mut App) -> tauri::Result<()> {
         .item(&new_window)
         .separator()
         .item(&open)
+        .item(&open_recent)
         .item(&save)
         .item(&save_as)
         .separator()

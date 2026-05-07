@@ -2,6 +2,7 @@ import { fileCommands as upstreamFileCommands } from '@upstream/command/commands
 import type { CommandDef, CommandServices } from '@/command/types';
 import type { DesktopBridgeApi } from '@/core/tauri-bridge';
 import { openPrintDialog } from '@/ui/print-dialog';
+import { openRecentDocumentsDialog } from '@/ui/recent-documents-dialog';
 
 type DesktopFileBridge = Pick<
   DesktopBridgeApi,
@@ -11,6 +12,13 @@ type DesktopFileBridge = Pick<
   | 'saveDocumentAsFromCommand'
   | 'exportPdfFromCommand'
   | 'printCurrentWebview'
+>;
+
+type DesktopRecentBridge = Pick<
+  DesktopBridgeApi,
+  | 'openDocumentByPath'
+  | 'listRecentDocuments'
+  | 'clearRecentDocuments'
 >;
 
 const upstreamById = new Map(upstreamFileCommands.map((command) => [command.id, command]));
@@ -25,6 +33,16 @@ function desktopBridge(wasm: unknown): DesktopFileBridge | null {
     && typeof candidate.exportPdfFromCommand === 'function'
     && typeof candidate.printCurrentWebview === 'function'
     ? candidate as DesktopFileBridge
+    : null;
+}
+
+function recentBridge(wasm: unknown): DesktopRecentBridge | null {
+  if (!wasm || typeof wasm !== 'object') return null;
+  const candidate = wasm as Partial<DesktopRecentBridge>;
+  return typeof candidate.openDocumentByPath === 'function'
+    && typeof candidate.listRecentDocuments === 'function'
+    && typeof candidate.clearRecentDocuments === 'function'
+    ? candidate as DesktopRecentBridge
     : null;
 }
 
@@ -108,6 +126,43 @@ const hopOnlyCommands: CommandDef[] = [
         return;
       }
       await desktop.createNewWindow();
+    },
+  },
+  {
+    id: 'file:open-recent',
+    label: '최근 문서',
+    shortcutLabel: 'Ctrl+Alt+O',
+    async execute(services) {
+      const desktop = recentBridge(services.wasm);
+      if (!desktop) {
+        alert('최근 문서는 HOP 데스크톱 앱에서 지원합니다.');
+        return;
+      }
+
+      try {
+        const documents = await desktop.listRecentDocuments();
+        if (documents.length === 0) {
+          emitStatus(services, '최근 문서가 없습니다');
+          alert('최근 문서가 없습니다.');
+          return;
+        }
+
+        const selected = await openRecentDocumentsDialog(documents, {
+          clearRecentDocuments: () => desktop.clearRecentDocuments(),
+        });
+        if (!selected) {
+          emitStatus(services, '최근 문서 목록을 닫았습니다');
+          return;
+        }
+
+        emitStatus(services, '파일 로딩 중...');
+        const payload = await desktop.openDocumentByPath(selected.path);
+        if (payload) {
+          services.eventBus.emit('desktop-document-loaded', payload);
+        }
+      } catch (error) {
+        reportCommandError(services, '최근 문서 열기', error);
+      }
     },
   },
   {

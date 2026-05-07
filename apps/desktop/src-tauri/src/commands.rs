@@ -1,4 +1,5 @@
 use crate::font_catalog::LocalFontEntry;
+use crate::recent_documents::{self, RecentDocument};
 use crate::state::{
     editable_core_from_bytes, AppState, DocumentFormat, DocumentOpenResult,
     ExternalModificationStatus, FileFingerprint, MutationResult, PageSvgResult, SaveResult,
@@ -43,11 +44,12 @@ pub fn open_document_tracking(
     source_fingerprint: Option<FileFingerprint>,
     state: State<'_, AppState>,
 ) -> Result<DocumentOpenResult, String> {
+    let path = PathBuf::from(path);
     state
         .sessions
         .lock()
         .map_err(|_| "문서 세션 잠금 실패".to_string())?
-        .open_document_tracking(PathBuf::from(path), source_fingerprint)
+        .open_document_tracking(path, source_fingerprint)
 }
 
 #[tauri::command]
@@ -108,6 +110,7 @@ pub fn prepare_staged_hwp_pdf_export(
 
 #[tauri::command]
 pub fn commit_staged_hwp_save(
+    app: AppHandle,
     doc_id: String,
     staged_path: String,
     target_path: String,
@@ -116,17 +119,44 @@ pub fn commit_staged_hwp_save(
     state: State<'_, AppState>,
 ) -> Result<SaveResult, String> {
     let target_path = PathBuf::from(target_path);
-    state
+    let result = state
         .sessions
         .lock()
         .map_err(|_| "문서 세션 잠금 실패".to_string())?
         .commit_staged_hwp_save(
             &doc_id,
             PathBuf::from(staged_path),
-            target_path,
+            target_path.clone(),
             expected_revision,
             allow_external_overwrite.unwrap_or(false),
-        )
+        )?;
+    let _ = recent_documents::record_document(&app, &target_path);
+    Ok(result)
+}
+
+#[tauri::command]
+pub fn list_recent_documents(app: AppHandle) -> Result<Vec<RecentDocument>, String> {
+    recent_documents::list_documents(&app)
+}
+
+#[tauri::command]
+pub fn clear_recent_documents(app: AppHandle) -> Result<(), String> {
+    recent_documents::clear_documents(&app)
+}
+
+#[tauri::command]
+pub fn record_recent_document(app: AppHandle, path: String) -> Result<(), String> {
+    recent_documents::record_document(&app, &PathBuf::from(path))
+}
+
+#[tauri::command]
+pub fn render_document_preview(path: String) -> Result<String, String> {
+    let path = PathBuf::from(path);
+    let bytes = std::fs::read(&path)
+        .map_err(|e| format!("미리보기용 문서를 읽을 수 없습니다: {} ({})", path.display(), e))?;
+    let core = editable_core_from_bytes(&bytes, "문서 파싱 실패", "미리보기용 문서 변환 실패")?;
+    core.render_page_svg_native(0)
+        .map_err(|e| format!("문서 미리보기를 렌더링할 수 없습니다: {}", e))
 }
 
 #[tauri::command]

@@ -82,6 +82,9 @@ describe('TauriBridge', () => {
         contentHash: hashBytes(new Uint8Array([10, 20, 30])),
       },
     });
+    expect(invokeMock).toHaveBeenCalledWith('record_recent_document', {
+      path: '/tmp/opened.hwp',
+    });
     expect(getWasmMock(bridge, 'loadDocumentMock')).toHaveBeenCalledWith(
       new Uint8Array([10, 20, 30]),
       'opened.hwp',
@@ -155,12 +158,17 @@ describe('TauriBridge', () => {
     fsOpenMock
       .mockResolvedValueOnce(readHandle([1]))
       .mockResolvedValueOnce(readHandle([2]));
-    invokeMock
-      .mockResolvedValueOnce(undefined)
-      .mockResolvedValueOnce(nativeOpenResult({ docId: 'old-doc', fileName: 'old.hwp' }))
-      .mockResolvedValueOnce(undefined)
-      .mockResolvedValueOnce(nativeOpenResult({ docId: 'new-doc', fileName: 'new.hwp' }))
-      .mockResolvedValueOnce(undefined);
+    invokeMock.mockImplementation(async (command: string, args: Record<string, unknown>) => {
+      if (command === 'prepare_document_open') return undefined;
+      if (command === 'record_recent_document') return undefined;
+      if (command === 'close_document') return undefined;
+      if (command === 'open_document_tracking') {
+        return args.path === '/tmp/old.hwp'
+          ? nativeOpenResult({ docId: 'old-doc', fileName: 'old.hwp' })
+          : nativeOpenResult({ docId: 'new-doc', fileName: 'new.hwp' });
+      }
+      throw new Error(`unexpected command ${command}`);
+    });
 
     await bridge.openDocumentByPath('/tmp/old.hwp');
     await bridge.openDocumentByPath('/tmp/new.hwp');
@@ -252,6 +260,20 @@ describe('TauriBridge', () => {
     expect(invokeMock).toHaveBeenNthCalledWith(2, 'start_update_install', {});
     expect(invokeMock).toHaveBeenNthCalledWith(3, 'restart_to_apply_update', {});
     expect(invokeMock).toHaveBeenNthCalledWith(4, 'cancel_app_quit', {});
+  });
+
+  it('proxies recent document commands through the Tauri bridge', async () => {
+    const bridge = new TauriBridge();
+    const documents = [{ path: '/tmp/recent.hwp', fileName: 'recent.hwp' }];
+    invokeMock
+      .mockResolvedValueOnce(documents)
+      .mockResolvedValueOnce(undefined);
+
+    await expect(bridge.listRecentDocuments()).resolves.toEqual(documents);
+    await expect(bridge.clearRecentDocuments()).resolves.toBeUndefined();
+
+    expect(invokeMock).toHaveBeenNthCalledWith(1, 'list_recent_documents', {});
+    expect(invokeMock).toHaveBeenNthCalledWith(2, 'clear_recent_documents', {});
   });
 
   it('blocks direct save for HWPX sources', async () => {

@@ -8,6 +8,7 @@ mod menu;
 mod pdf_export;
 mod pdf_font_fallbacks;
 mod pending_open;
+mod recent_documents;
 mod state;
 #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 mod updates;
@@ -20,12 +21,14 @@ use tauri::RunEvent;
 use tauri::{AppHandle, Emitter, Manager};
 
 use commands::{
-    cancel_app_quit, check_external_modification, close_document, commit_staged_hwp_save,
-    create_document, create_editor_window, desktop_platform, destroy_current_window, export_pdf,
-    export_pdf_from_hwp_path, list_local_fonts, mark_document_dirty, mutate_document,
+    cancel_app_quit, check_external_modification, clear_recent_documents, close_document,
+    commit_staged_hwp_save, create_document, create_editor_window, desktop_platform,
+    destroy_current_window, export_pdf, export_pdf_from_hwp_path, list_local_fonts,
+    list_recent_documents, mark_document_dirty, mutate_document,
     open_document_tracking, prepare_document_open, prepare_staged_hwp_pdf_export,
-    prepare_staged_hwp_save, print_webview, query_document, read_local_font, render_page_svg,
-    reveal_in_folder, take_pending_open_paths,
+    prepare_staged_hwp_save, print_webview, query_document, read_local_font,
+    record_recent_document, render_document_preview, render_page_svg, reveal_in_folder,
+    take_pending_open_paths,
 };
 use state::AppState;
 use updates::{get_update_state, restart_to_apply_update, start_update_install};
@@ -97,6 +100,10 @@ pub fn run() {
             check_external_modification,
             take_pending_open_paths,
             reveal_in_folder,
+            list_recent_documents,
+            clear_recent_documents,
+            record_recent_document,
+            render_document_preview,
             get_update_state,
             start_update_install,
             restart_to_apply_update,
