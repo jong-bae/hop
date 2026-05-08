@@ -60,10 +60,6 @@ export class HomeScreen {
     const hero = document.createElement('div');
     hero.className = 'home-hero';
 
-    const eyebrow = document.createElement('div');
-    eyebrow.className = 'home-eyebrow';
-    eyebrow.textContent = 'Open HWP';
-
     const title = document.createElement('h1');
     title.className = 'home-title';
     title.textContent = '최근에 작업한 문서를 바로 이어서 열어보세요';
@@ -84,7 +80,7 @@ export class HomeScreen {
       }),
     );
 
-    hero.append(eyebrow, title, subtitle, actions);
+    hero.append(title, subtitle, actions);
 
     const recentSection = document.createElement('section');
     recentSection.className = 'home-recent';

@@ -2,7 +2,7 @@
   "name": "hop",
   "version": "0.1.11",
   "private": true,
-  "description": "HOP is Open HWP",
+  "description": "HOP desktop editor for HWP and HWPX documents",
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@10.33.0",

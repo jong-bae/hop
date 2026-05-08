@@ -1,6 +1,6 @@
 # HOP
 
-**HOP is Open HWP**
+**HWP/HWPX 문서를 위한 데스크톱 편집기**
 
 HOP는 HWP/HWPX 문서를 보고 편집할 수 있는 오픈소스 macOS, Windows, Linux용 데스크탑 앱입니다.
 

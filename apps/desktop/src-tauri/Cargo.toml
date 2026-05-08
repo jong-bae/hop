@@ -2,7 +2,7 @@
 name = "hop-desktop"
 version = "0.1.11"
 edition = "2021"
-description = "HOP - Open HWP desktop app"
+description = "HOP desktop editor for HWP and HWPX documents"
 license = "MIT"
 
 [lib]

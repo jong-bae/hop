@@ -31,7 +31,7 @@
     "targets": "all",
     "publisher": "golbin.net",
     "shortDescription": "Open desktop editor for HWP and HWPX documents",
-    "longDescription": "HOP is Open HWP. HOP opens, edits, saves, and exports HWP/HWPX documents.",
+    "longDescription": "HOP opens, edits, saves, and exports HWP/HWPX documents.",
     "category": "Productivity",
     "copyright": "Copyright (c) 2026 HOP contributors",
     "icon": [
