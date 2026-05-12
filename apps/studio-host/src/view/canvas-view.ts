@@ -54,6 +54,23 @@ export function applyCanvasDisplayLayout(
   }
 }
 
+function applyOverlayDisplayLayout(
+  container: HTMLElement,
+  canvas: HTMLCanvasElement,
+  pageIndex: number,
+): void {
+  const overlays = container.querySelectorAll<HTMLElement>(
+    `[data-rhwp-overlay="behind-${pageIndex}"], [data-rhwp-overlay="front-${pageIndex}"]`,
+  );
+  for (const overlay of overlays) {
+    overlay.style.top = canvas.style.top;
+    overlay.style.left = canvas.style.left;
+    overlay.style.transform = canvas.style.transform;
+    overlay.style.width = canvas.style.width;
+    overlay.style.height = canvas.style.height;
+  }
+}
+
 export class CanvasView {
   private virtualScroll: VirtualScroll;
   private canvasPool: CanvasPool;
@@ -145,7 +162,7 @@ export class CanvasView {
     for (const pageIdx of this.canvasPool.activePages) {
       if (!prefetchSet.has(pageIdx)) {
         this.pageRenderer.cancelReRender(pageIdx);
-        this.canvasPool.release(pageIdx);
+        this.releasePage(pageIdx);
       }
     }
 
@@ -186,13 +203,21 @@ export class CanvasView {
     }
     const renderScale = zoom * dpr;
 
-    canvas.style.top = `${this.virtualScroll.getPageOffset(pageIdx)}px`;
+    applyCanvasDisplayLayout(
+      canvas,
+      this.virtualScroll,
+      pageIdx,
+      this.scrollContent.clientWidth,
+      dpr,
+    );
+    this.removePageOverlays(pageIdx);
+    this.scrollContent.appendChild(canvas);
 
     try {
       this.pageRenderer.renderPage(pageIdx, canvas, renderScale);
     } catch (e) {
       console.error(`[CanvasView] 페이지 ${pageIdx} 렌더링 실패:`, e);
-      this.canvasPool.release(pageIdx);
+      this.releasePage(pageIdx);
       return;
     }
 
@@ -203,8 +228,7 @@ export class CanvasView {
       this.scrollContent.clientWidth,
       dpr,
     );
-
-    this.scrollContent.appendChild(canvas);
+    applyOverlayDisplayLayout(this.scrollContent, canvas, pageIdx);
   }
 
   private repositionActivePages(): void {
@@ -222,6 +246,7 @@ export class CanvasView {
         scrollContentWidth,
         inferCanvasDevicePixelRatio(canvas, this.virtualScroll, pageIdx, fallbackDpr),
       );
+      applyOverlayDisplayLayout(this.scrollContent, canvas, pageIdx);
     }
   }
 
@@ -236,7 +261,7 @@ export class CanvasView {
     const isGrid = this.virtualScroll.isGridMode();
 
     if (wasGrid || isGrid) {
-      this.canvasPool.releaseAll();
+      this.releaseAllPages();
       this.pageRenderer.cancelAll();
     } else {
       this.repositionActivePages();
@@ -263,7 +288,7 @@ export class CanvasView {
     const newCenter = newOffset + newHeight * ratio;
     this.viewportManager.setScrollTop(newCenter - vpHeight / 2);
 
-    this.canvasPool.releaseAll();
+    this.releaseAllPages();
     this.pageRenderer.cancelAll();
     this.updateVisiblePages();
 
@@ -284,17 +309,39 @@ export class CanvasView {
     }
 
     this.recalcLayout();
-    this.canvasPool.releaseAll();
+    this.releaseAllPages();
     this.pageRenderer.cancelAll();
     this.updateVisiblePages();
   }
 
   private reset(): void {
     this.pageRenderer.cancelAll();
-    this.canvasPool.releaseAll();
+    this.releaseAllPages();
     this.currentVisiblePages = [];
     this.pages = [];
     this.scrollContent.replaceChildren();
+  }
+
+  private releasePage(pageIdx: number): void {
+    this.removePageOverlays(pageIdx);
+    this.canvasPool.release(pageIdx);
+  }
+
+  private releaseAllPages(): void {
+    this.removeAllPageOverlays();
+    this.canvasPool.releaseAll();
+  }
+
+  private removePageOverlays(pageIdx: number): void {
+    this.scrollContent
+      .querySelectorAll(`[data-rhwp-overlay="behind-${pageIdx}"], [data-rhwp-overlay="front-${pageIdx}"]`)
+      .forEach((overlay) => overlay.remove());
+  }
+
+  private removeAllPageOverlays(): void {
+    this.scrollContent
+      .querySelectorAll('[data-rhwp-overlay]')
+      .forEach((overlay) => overlay.remove());
   }
 
   dispose(): void {
