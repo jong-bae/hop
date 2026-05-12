@@ -40,13 +40,12 @@ test('HOP preserves upstream lineseg validation and auto-reflow on document load
   assert.match(mainSource, /wasm\.reflowLinesegs\(\)/);
   assert.match(mainSource, /canvasView\?\.loadDocument\(\)/);
 
-  const validationBlock = mainSource.slice(
-    mainSource.indexOf('const report = wasm.getValidationWarnings()'),
-    mainSource.indexOf(
-      '} catch (error)',
-      mainSource.indexOf('const report = wasm.getValidationWarnings()'),
-    ),
-  );
+  const validationStart = mainSource.indexOf('const report = wasm.getValidationWarnings()');
+  assert.notEqual(validationStart, -1, 'validation block should call getValidationWarnings');
+  const validationEnd = mainSource.indexOf('} catch (error)', validationStart);
+  assert.ok(validationEnd > validationStart, 'validation block should be wrapped in its own catch');
+
+  const validationBlock = mainSource.slice(validationStart, validationEnd);
   assert.doesNotMatch(validationBlock, /sourceFormat\s*===\s*['"]hwpx['"]/);
 });
 

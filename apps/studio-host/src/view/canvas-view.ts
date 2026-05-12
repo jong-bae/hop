@@ -3,84 +3,28 @@ import { EventBus } from '@upstream/core/event-bus';
 import type { PageInfo } from '@upstream/core/types';
 import { VirtualScroll } from '@upstream/view/virtual-scroll';
 import { CanvasPool } from '@upstream/view/canvas-pool';
-import { PageRenderer } from '@upstream/view/page-renderer';
 import { ViewportManager } from '@upstream/view/viewport-manager';
 import { CoordinateSystem } from '@upstream/view/coordinate-system';
-import { resolveVirtualScrollPageLeft } from './page-left';
-
-type CanvasLayout = {
-  getPageOffset(pageIndex: number): number;
-  getPageLeft(pageIndex: number): number;
-  getPageWidth(pageIndex: number): number;
-};
-
-export function inferCanvasDevicePixelRatio(
-  canvas: HTMLCanvasElement,
-  layout: CanvasLayout,
-  pageIndex: number,
-  fallbackDpr = window.devicePixelRatio || 1,
-): number {
-  const pageWidth = layout.getPageWidth(pageIndex);
-  if (pageWidth <= 0) {
-    return fallbackDpr;
-  }
-
-  const inferredDpr = canvas.width / pageWidth;
-  if (!Number.isFinite(inferredDpr) || inferredDpr <= 0) {
-    return fallbackDpr;
-  }
-
-  return inferredDpr;
-}
-
-export function applyCanvasDisplayLayout(
-  canvas: HTMLCanvasElement,
-  layout: CanvasLayout,
-  pageIndex: number,
-  scrollContentWidth: number,
-  dpr: number,
-): void {
-  const safeDpr = Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
-  canvas.style.top = `${layout.getPageOffset(pageIndex)}px`;
-  canvas.style.left = `${resolveVirtualScrollPageLeft(layout, pageIndex, scrollContentWidth)}px`;
-  canvas.style.transform = 'none';
-
-  const pageDisplayWidth =
-    canvas.width > 0 ? canvas.width / safeDpr : layout.getPageWidth(pageIndex);
-  const pageDisplayHeight = canvas.height > 0 ? canvas.height / safeDpr : 0;
-  canvas.style.width = `${pageDisplayWidth}px`;
-  if (pageDisplayHeight > 0) {
-    canvas.style.height = `${pageDisplayHeight}px`;
-  }
-}
-
-function applyOverlayDisplayLayout(
-  container: HTMLElement,
-  canvas: HTMLCanvasElement,
-  pageIndex: number,
-): void {
-  const overlays = container.querySelectorAll<HTMLElement>(
-    `[data-rhwp-overlay="behind-${pageIndex}"], [data-rhwp-overlay="front-${pageIndex}"]`,
-  );
-  for (const overlay of overlays) {
-    overlay.style.top = canvas.style.top;
-    overlay.style.left = canvas.style.left;
-    overlay.style.transform = canvas.style.transform;
-    overlay.style.width = canvas.style.width;
-    overlay.style.height = canvas.style.height;
-  }
-}
+import {
+  applyCanvasDisplayLayout,
+  inferCanvasDevicePixelRatio,
+} from './canvas-layout';
+import { HopPageRenderer } from './hop-page-renderer';
+import {
+  applyPageOverlayDisplayLayout,
+  removeAllPageOverlays,
+  removePageOverlays,
+} from './page-overlays';
 
 export class CanvasView {
   private virtualScroll: VirtualScroll;
   private canvasPool: CanvasPool;
-  private pageRenderer: PageRenderer;
+  private pageRenderer: HopPageRenderer;
   private viewportManager: ViewportManager;
   private coordinateSystem: CoordinateSystem;
 
   private scrollContent: HTMLElement;
   private pages: PageInfo[] = [];
-  private currentVisiblePages: number[] = [];
   private unsubscribers: (() => void)[] = [];
 
   constructor(
@@ -90,7 +34,7 @@ export class CanvasView {
   ) {
     this.virtualScroll = new VirtualScroll();
     this.canvasPool = new CanvasPool();
-    this.pageRenderer = new PageRenderer(wasm);
+    this.pageRenderer = new HopPageRenderer(wasm);
     this.viewportManager = new ViewportManager(eventBus);
     this.coordinateSystem = new CoordinateSystem(this.virtualScroll);
 
@@ -181,8 +125,6 @@ export class CanvasView {
         this.virtualScroll.pageCount,
       );
     }
-
-    this.currentVisiblePages = visiblePages;
   }
 
   private renderPage(pageIdx: number): void {
@@ -210,7 +152,7 @@ export class CanvasView {
       this.scrollContent.clientWidth,
       dpr,
     );
-    this.removePageOverlays(pageIdx);
+    removePageOverlays(this.scrollContent, pageIdx);
     this.scrollContent.appendChild(canvas);
 
     try {
@@ -228,7 +170,7 @@ export class CanvasView {
       this.scrollContent.clientWidth,
       dpr,
     );
-    applyOverlayDisplayLayout(this.scrollContent, canvas, pageIdx);
+    applyPageOverlayDisplayLayout(this.scrollContent, canvas, pageIdx);
   }
 
   private repositionActivePages(): void {
@@ -246,7 +188,7 @@ export class CanvasView {
         scrollContentWidth,
         inferCanvasDevicePixelRatio(canvas, this.virtualScroll, pageIdx, fallbackDpr),
       );
-      applyOverlayDisplayLayout(this.scrollContent, canvas, pageIdx);
+      applyPageOverlayDisplayLayout(this.scrollContent, canvas, pageIdx);
     }
   }
 
@@ -317,31 +259,18 @@ export class CanvasView {
   private reset(): void {
     this.pageRenderer.cancelAll();
     this.releaseAllPages();
-    this.currentVisiblePages = [];
     this.pages = [];
     this.scrollContent.replaceChildren();
   }
 
   private releasePage(pageIdx: number): void {
-    this.removePageOverlays(pageIdx);
+    removePageOverlays(this.scrollContent, pageIdx);
     this.canvasPool.release(pageIdx);
   }
 
   private releaseAllPages(): void {
-    this.removeAllPageOverlays();
+    removeAllPageOverlays(this.scrollContent);
     this.canvasPool.releaseAll();
-  }
-
-  private removePageOverlays(pageIdx: number): void {
-    this.scrollContent
-      .querySelectorAll(`[data-rhwp-overlay="behind-${pageIdx}"], [data-rhwp-overlay="front-${pageIdx}"]`)
-      .forEach((overlay) => overlay.remove());
-  }
-
-  private removeAllPageOverlays(): void {
-    this.scrollContent
-      .querySelectorAll('[data-rhwp-overlay]')
-      .forEach((overlay) => overlay.remove());
   }
 
   dispose(): void {

@@ -103,6 +103,16 @@ vi.mock('@upstream/view/page-renderer', () => ({
       renderPageParentMock(Boolean(canvas.parentElement), canvas.style.left);
       canvas.width = Math.round(1000 * scale);
       canvas.height = Math.round(1400 * scale);
+      const parent = canvas.parentElement as unknown as MockNode | null;
+      const overlay = createMockNode();
+      overlay.dataset = { rhwpOverlay: `front-${pageIdx}` };
+      parent?.appendChild(overlay);
+    }
+
+    renderPageFlow(pageIdx: number, canvas: HTMLCanvasElement, scale: number): void {
+      renderPageMock(pageIdx, scale);
+      canvas.width = Math.round(1000 * scale);
+      canvas.height = Math.round(1400 * scale);
     }
 
     cancelReRender(): void {}
@@ -141,9 +151,11 @@ vi.mock('@upstream/view/coordinate-system', () => ({
 
 import {
   CanvasView,
+} from './canvas-view';
+import {
   applyCanvasDisplayLayout,
   inferCanvasDevicePixelRatio,
-} from './canvas-view';
+} from './canvas-layout';
 
 type MockNode = {
   id?: string;
@@ -323,6 +335,8 @@ describe('CanvasView viewport resize behavior', () => {
     expect(canvas?.style.left).toBe('21px');
     expect(renderPageMock).toHaveBeenCalledTimes(1);
     expect(renderPageParentMock).toHaveBeenCalledWith(true, '21px');
+    const overlay = scrollContent.querySelectorAll('[data-rhwp-overlay]')[0];
+    expect(overlay?.style.left).toBe('21px');
 
     viewportState.width = 1200;
     scrollContentState.width = 1200;
@@ -332,7 +346,10 @@ describe('CanvasView viewport resize behavior', () => {
     expect(canvas?.style.left).toBe('100px');
     expect(renderPageMock).toHaveBeenCalledTimes(1);
     expect(canvas?.style.width).toBe('1000px');
+    expect(overlay?.style.left).toBe('100px');
 
     view.dispose();
+
+    expect(scrollContent.querySelectorAll('[data-rhwp-overlay]')).toHaveLength(0);
   });
 });
