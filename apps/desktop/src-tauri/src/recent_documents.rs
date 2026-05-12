@@ -28,8 +28,19 @@ pub fn clear_documents(app: &AppHandle) -> Result<(), String> {
 }
 
 pub fn record_document(app: &AppHandle, path: &Path) -> Result<(), String> {
-    record_document_at(&store_path(app)?, path)
+    if record_document_at(&store_path(app)?, path)? {
+        note_platform_recent_document(app, path);
+    }
+    Ok(())
 }
+
+#[cfg(target_os = "macos")]
+fn note_platform_recent_document(app: &AppHandle, path: &Path) {
+    let _ = crate::macos_recent_documents::note_recent_document(app, path);
+}
+
+#[cfg(not(target_os = "macos"))]
+fn note_platform_recent_document(_app: &AppHandle, _path: &Path) {}
 
 fn store_path(app: &AppHandle) -> Result<PathBuf, String> {
     let dir = app
@@ -49,9 +60,9 @@ fn list_documents_at(store_path: &Path) -> Result<Vec<RecentDocument>, String> {
         .collect())
 }
 
-fn record_document_at(store_path: &Path, path: &Path) -> Result<(), String> {
-    if !is_supported_document_path(path) {
-        return Ok(());
+fn record_document_at(store_path: &Path, path: &Path) -> Result<bool, String> {
+    if !is_existing_supported_document_path(path) {
+        return Ok(false);
     }
 
     let normalized_path = normalized_document_path(path);
@@ -60,7 +71,7 @@ fn record_document_at(store_path: &Path, path: &Path) -> Result<(), String> {
         .and_then(|value| value.to_str())
         .map(str::to_string)
     else {
-        return Ok(());
+        return Ok(false);
     };
 
     let mut documents = list_documents_at(store_path)?;
@@ -73,7 +84,8 @@ fn record_document_at(store_path: &Path, path: &Path) -> Result<(), String> {
         },
     );
     documents.truncate(MAX_RECENT_DOCUMENTS);
-    write_store(store_path, &RecentDocumentStore { documents })
+    write_store(store_path, &RecentDocumentStore { documents })?;
+    Ok(true)
 }
 
 fn read_store(store_path: &Path) -> Result<RecentDocumentStore, String> {
@@ -93,11 +105,15 @@ fn write_store(store_path: &Path, store: &RecentDocumentStore) -> Result<(), Str
     }
     let content = serde_json::to_vec_pretty(store)
         .map_err(|e| format!("최근 문서 목록을 저장할 수 없습니다: {}", e))?;
-    fs::write(store_path, content).map_err(|e| format!("최근 문서 목록을 저장할 수 없습니다: {}", e))
+    fs::write(store_path, content)
+        .map_err(|e| format!("최근 문서 목록을 저장할 수 없습니다: {}", e))
 }
 
 fn is_existing_supported_document(path: &str) -> bool {
-    let path = Path::new(path);
+    is_existing_supported_document_path(Path::new(path))
+}
+
+fn is_existing_supported_document_path(path: &Path) -> bool {
     path.is_file() && is_supported_document_path(path)
 }
 
@@ -139,14 +155,34 @@ mod tests {
         fs::write(&first, b"first").unwrap();
         fs::write(&second, b"second").unwrap();
 
-        record_document_at(&store, &first).unwrap();
-        record_document_at(&store, &second).unwrap();
-        record_document_at(&store, &first).unwrap();
+        assert!(record_document_at(&store, &first).unwrap());
+        assert!(record_document_at(&store, &second).unwrap());
+        assert!(record_document_at(&store, &first).unwrap());
 
         let documents = list_documents_at(&store).unwrap();
         assert_eq!(documents.len(), 2);
         assert_eq!(documents[0].file_name, "first.hwp");
         assert_eq!(documents[1].file_name, "second.hwpx");
+    }
+
+    #[test]
+    fn record_document_skips_unsupported_paths() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = dir.path().join("recent.json");
+        let unsupported = dir.path().join("notes.txt");
+        fs::write(&unsupported, b"notes").unwrap();
+
+        assert!(!record_document_at(&store, &unsupported).unwrap());
+        assert!(!store.exists());
+    }
+
+    #[test]
+    fn record_document_skips_missing_paths() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = dir.path().join("recent.json");
+
+        assert!(!record_document_at(&store, &dir.path().join("missing.hwp")).unwrap());
+        assert!(!store.exists());
     }
 
     #[test]
@@ -166,7 +202,11 @@ mod tests {
                         file_name: "notes.txt".to_string(),
                     },
                     RecentDocument {
-                        path: dir.path().join("missing.hwpx").to_string_lossy().to_string(),
+                        path: dir
+                            .path()
+                            .join("missing.hwpx")
+                            .to_string_lossy()
+                            .to_string(),
                         file_name: "missing.hwpx".to_string(),
                     },
                     RecentDocument {
@@ -194,7 +234,7 @@ mod tests {
         for index in 0..12 {
             let path = dir.path().join(format!("doc-{index}.hwp"));
             fs::write(&path, b"doc").unwrap();
-            record_document_at(&store, &path).unwrap();
+            assert!(record_document_at(&store, &path).unwrap());
         }
 
         let documents = list_documents_at(&store).unwrap();
@@ -209,6 +249,9 @@ mod tests {
         let store = dir.path().join("recent.json");
         fs::write(&store, b"not json").unwrap();
 
-        assert_eq!(list_documents_at(&store).unwrap(), Vec::<RecentDocument>::new());
+        assert_eq!(
+            list_documents_at(&store).unwrap(),
+            Vec::<RecentDocument>::new()
+        );
     }
 }

@@ -35,8 +35,10 @@ vi.mock('@/core/wasm-bridge', () => ({
     }));
     createNewDocumentMock = vi.fn(() => ({ pageCount: 1, fontsUsed: [] }));
     exportHwpMock = vi.fn(() => new Uint8Array([1, 2, 3]));
+    sourceFormat = 'hwp';
 
     loadDocument(bytes: Uint8Array, fileName: string) {
+      this.sourceFormat = fileName.endsWith('.hwpx') || bytes[0] === 0x50 ? 'hwpx' : 'hwp';
       return this.loadDocumentMock(bytes, fileName);
     }
 
@@ -46,6 +48,10 @@ vi.mock('@/core/wasm-bridge', () => ({
 
     exportHwp() {
       return this.exportHwpMock();
+    }
+
+    getSourceFormat() {
+      return this.sourceFormat;
     }
   },
 }));
@@ -211,6 +217,62 @@ describe('TauriBridge', () => {
     await expect(bridge.createNewDocumentAsync()).rejects.toThrow('new doc failed');
 
     expect(invokeMock).toHaveBeenCalledWith('close_document', { docId: 'new-native' });
+  });
+
+  it('resets source format to hwp after creating a native blank document', async () => {
+    const bridge = new TauriBridge();
+    fsOpenMock.mockResolvedValue(readHandle([4, 5, 6]));
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === 'prepare_document_open') return undefined;
+      if (command === 'open_document_tracking') {
+        return nativeOpenResult({
+          docId: 'opened-hwpx',
+          fileName: 'opened.hwpx',
+          sourcePath: '/tmp/opened.hwpx',
+          format: 'hwpx',
+        });
+      }
+      if (command === 'create_document') {
+        return nativeOpenResult({
+          docId: 'new-hwp',
+          fileName: '새 문서.hwp',
+          sourcePath: null,
+          format: 'hwp',
+        });
+      }
+      if (command === 'close_document') return undefined;
+      throw new Error(`unexpected command ${command}`);
+    });
+
+    await bridge.openDocumentByPath('/tmp/opened.hwpx');
+
+    expect(bridge.getSourceFormat()).toBe('hwpx');
+
+    await bridge.createNewDocumentAsync();
+
+    expect(bridge.getSourceFormat()).toBe('hwp');
+  });
+
+  it('uses wasm-detected source format for opened bytes when the native extension is misleading', async () => {
+    const bridge = new TauriBridge();
+    fsOpenMock.mockResolvedValue(readHandle([0x50, 0x4b, 0x03, 0x04]));
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === 'prepare_document_open') return undefined;
+      if (command === 'open_document_tracking') {
+        return nativeOpenResult({
+          docId: 'misnamed-hwpx',
+          fileName: 'misnamed.hwp',
+          sourcePath: '/tmp/misnamed.hwp',
+          format: 'hwp',
+        });
+      }
+      if (command === 'record_recent_document') return undefined;
+      throw new Error(`unexpected command ${command}`);
+    });
+
+    await bridge.openDocumentByPath('/tmp/misnamed.hwp');
+
+    expect(bridge.getSourceFormat()).toBe('hwpx');
   });
 
   it('tracks dirty state in the document title and mirrors it natively', async () => {

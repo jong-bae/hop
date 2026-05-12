@@ -122,7 +122,7 @@ export class TauriBridge extends WasmBridge implements DesktopBridgeApi {
     const previousDocId = this.docId;
     try {
       const info = super.loadDocument(bytes, result.fileName);
-      this.applyNativeOpenResult(result);
+      this.applyNativeOpenResult(result, this.normalizedSourceFormat(super.getSourceFormat()));
       await this.recordRecentDocument(path);
       await this.closeReplacedDocument(previousDocId, result.docId);
       return {
@@ -160,6 +160,10 @@ export class TauriBridge extends WasmBridge implements DesktopBridgeApi {
 
   async createNewWindow(): Promise<string> {
     return this.invoke<string>('create_editor_window');
+  }
+
+  getSourceFormat(): string {
+    return this.sourceFormat;
   }
 
   async saveDocumentFromCommand(): Promise<DesktopSaveResult | null> {
@@ -481,10 +485,14 @@ export class TauriBridge extends WasmBridge implements DesktopBridgeApi {
     return { len: size, modifiedMillis };
   }
 
-  private applyNativeOpenResult(result: NativeOpenResult): void {
+  private normalizedSourceFormat(value: string): DocumentFormat {
+    return value === 'hwpx' ? 'hwpx' : 'hwp';
+  }
+
+  private applyNativeOpenResult(result: NativeOpenResult, sourceFormat = result.format): void {
     this.docId = result.docId;
     this.sourcePath = result.sourcePath ?? null;
-    this.sourceFormat = result.format;
+    this.sourceFormat = sourceFormat;
     this.revision = result.revision;
     this.dirty = result.dirty;
     this.fileName = result.fileName;
