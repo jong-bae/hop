@@ -59,6 +59,11 @@ export interface DesktopSaveResult {
   warnings: unknown[];
 }
 
+export interface RecentDocument {
+  path: string;
+  fileName: string;
+}
+
 export interface DesktopLoadPayload {
   docInfo: DocumentInfo;
   message: string;
@@ -77,6 +82,9 @@ export interface DesktopBridgeApi {
   destroyCurrentWindow(): Promise<void>;
   cancelAppQuit(): Promise<void>;
   revealInFolder(): Promise<void>;
+  listRecentDocuments(): Promise<RecentDocument[]>;
+  clearRecentDocuments(): Promise<void>;
+  renderDocumentPreview(path: string): Promise<string>;
   getUpdateState(): Promise<DesktopUpdateState>;
   startUpdateInstall(): Promise<void>;
   restartToApplyUpdate(): Promise<void>;
@@ -115,6 +123,7 @@ export class TauriBridge extends WasmBridge implements DesktopBridgeApi {
     try {
       const info = super.loadDocument(bytes, result.fileName);
       this.applyNativeOpenResult(result);
+      await this.recordRecentDocument(path);
       await this.closeReplacedDocument(previousDocId, result.docId);
       return {
         docInfo: info,
@@ -209,6 +218,18 @@ export class TauriBridge extends WasmBridge implements DesktopBridgeApi {
     await this.invoke<void>('reveal_in_folder', { path: this.sourcePath });
   }
 
+  async listRecentDocuments(): Promise<RecentDocument[]> {
+    return this.invoke<RecentDocument[]>('list_recent_documents');
+  }
+
+  async clearRecentDocuments(): Promise<void> {
+    await this.invoke<void>('clear_recent_documents');
+  }
+
+  async renderDocumentPreview(path: string): Promise<string> {
+    return this.invoke<string>('render_document_preview', { path });
+  }
+
   async getUpdateState(): Promise<DesktopUpdateState> {
     return this.invoke<DesktopUpdateState>('get_update_state');
   }
@@ -251,6 +272,12 @@ export class TauriBridge extends WasmBridge implements DesktopBridgeApi {
     } catch (error) {
       console.warn('[TauriBridge] native document cleanup failed:', error);
     }
+  }
+
+  private async recordRecentDocument(path: string): Promise<void> {
+    await this.invoke<void>('record_recent_document', { path }).catch((error: unknown) => {
+      console.warn('[TauriBridge] recent document update failed:', error);
+    });
   }
 
   private async closeReplacedDocument(previousDocId: string | null, nextDocId: string): Promise<void> {
