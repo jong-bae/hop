@@ -36,11 +36,18 @@ test('HOP preserves upstream lineseg validation and auto-reflow on document load
   const mainSource = await readFile(join(repoRoot, 'apps/studio-host/src/main.ts'), 'utf8');
 
   assert.match(mainSource, /showValidationModalIfNeeded/);
-  assert.match(mainSource, /currentSourceFormat/);
-  assert.match(mainSource, /sourceFormat\s*===\s*['"]hwpx['"]/);
   assert.match(mainSource, /wasm\.getValidationWarnings\(\)/);
   assert.match(mainSource, /wasm\.reflowLinesegs\(\)/);
   assert.match(mainSource, /canvasView\?\.loadDocument\(\)/);
+
+  const validationBlock = mainSource.slice(
+    mainSource.indexOf('const report = wasm.getValidationWarnings()'),
+    mainSource.indexOf(
+      '} catch (error)',
+      mainSource.indexOf('const report = wasm.getValidationWarnings()'),
+    ),
+  );
+  assert.doesNotMatch(validationBlock, /sourceFormat\s*===\s*['"]hwpx['"]/);
 });
 
 test('HOP product info keeps the upstream rhwp version and adds HOP version separately', async () => {

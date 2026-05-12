@@ -40,8 +40,6 @@ const wasm = createBridge();
 const eventBus = new EventBus();
 let desktopPlatform = detectDesktopPlatform();
 
-type DocumentSourceFormat = 'hwp' | 'hwpx';
-
 type DirtyAwareBridge = {
   markDocumentDirty?(): void;
   hasUnsavedChanges?(): boolean;
@@ -107,10 +105,6 @@ const sbPage = () => document.getElementById('sb-page')!;
 const sbSection = () => document.getElementById('sb-section')!;
 const sbZoomVal = () => document.getElementById('sb-zoom-val')!;
 const ZOOM_STEP = 0.1;
-
-function currentSourceFormat(): DocumentSourceFormat {
-  return wasm.getSourceFormat() === 'hwpx' ? 'hwpx' : 'hwp';
-}
 
 async function initialize(): Promise<void> {
   const msg = sbMessage();
@@ -534,7 +528,6 @@ function setupEventListeners(): void {
 async function initializeDocument(
   docInfo: DocumentInfo,
   displayName: string,
-  sourceFormat: DocumentSourceFormat = currentSourceFormat(),
 ): Promise<void> {
   const msg = sbMessage();
   try {
@@ -555,15 +548,13 @@ async function initializeDocument(
     inputHandler?.activateWithCaretPosition();
 
     try {
-      if (sourceFormat === 'hwpx') {
-        const report = wasm.getValidationWarnings();
-        if (report.count > 0) {
-          const choice = await showValidationModalIfNeeded(report);
-          if (choice === 'auto-fix') {
-            const reflowedCount = wasm.reflowLinesegs();
-            canvasView?.loadDocument();
-            msg.textContent = `${displayName} (비표준 lineseg ${reflowedCount}건 자동 보정됨)`;
-          }
+      const report = wasm.getValidationWarnings();
+      if (report.count > 0) {
+        const choice = await showValidationModalIfNeeded(report);
+        if (choice === 'auto-fix') {
+          const reflowedCount = wasm.reflowLinesegs();
+          canvasView?.loadDocument();
+          msg.textContent = `${displayName} (비표준 lineseg ${reflowedCount}건 자동 보정됨)`;
         }
       }
     } catch (error) {
@@ -586,7 +577,6 @@ async function loadFile(file: File): Promise<void> {
     await initializeDocument(
       docInfo,
       `${file.name} — ${docInfo.pageCount}페이지 (${elapsed.toFixed(1)}ms)`,
-      currentSourceFormat(),
     );
   } catch (error) {
     const errMsg = `파일 로드 실패: ${error}`;
@@ -607,7 +597,7 @@ async function createNewDocument(): Promise<void> {
       return;
     }
     const docInfo = wasm.createNewDocument();
-    await initializeDocument(docInfo, `새 문서.hwp — ${docInfo.pageCount}페이지`, 'hwp');
+    await initializeDocument(docInfo, `새 문서.hwp — ${docInfo.pageCount}페이지`);
   } catch (error) {
     msg.textContent = `새 문서 생성 실패: ${error}`;
     console.error('[main] 새 문서 생성 실패:', error);
