@@ -33,6 +33,7 @@ import { TableResizeRenderer } from '@/engine/table-resize-renderer';
 import { Ruler } from '@/view/ruler';
 import { enhanceCustomSelects } from '@/ui/custom-select';
 import { UpdateNotice, type UpdateNoticeActions } from '@/ui/update-notice';
+import { HomeScreen } from '@/ui/home-screen';
 import type { DesktopBridgeApi } from '@/core/tauri-bridge';
 
 const wasm = createBridge();
@@ -53,6 +54,7 @@ let canvasView: CanvasView | null = null;
 let inputHandler: InputHandler | null = null;
 let toolbar: Toolbar | null = null;
 let ruler: Ruler | null = null;
+let homeScreen: HomeScreen | null = null;
 
 
 // ─── 커맨드 시스템 ─────────────────────────────
@@ -118,6 +120,20 @@ async function initialize(): Promise<void> {
 
     const container = document.getElementById('scroll-container')!;
     canvasView = new CanvasView(container, wasm, eventBus);
+    homeScreen = new HomeScreen(container, wasm, {
+      openFile: () => {
+        dispatcher.dispatch('file:open');
+      },
+      createNewDocument: () => {
+        dispatcher.dispatch('file:new-doc');
+      },
+      onDocumentLoaded: (payload) => {
+        eventBus.emit('desktop-document-loaded', payload);
+      },
+      setMessage: (message) => {
+        sbMessage().textContent = message;
+      },
+    });
 
     // 눈금자 초기화
     ruler = new Ruler(
@@ -217,6 +233,8 @@ async function initialize(): Promise<void> {
       },
     }).catch((error) => {
       console.error('[main] desktop event setup failed:', error);
+    }).finally(() => {
+      void homeScreen?.refresh(wasm.pageCount > 0);
     });
 
     // E2E 테스트용 전역 노출 (개발 모드 전용)
@@ -275,14 +293,15 @@ function setupGlobalShortcuts(): void {
       }
     }
 
-    if (primaryModifier && !e.altKey) {
+    if (primaryModifier) {
       let commandId: string | null = null;
       const key = e.key.toLowerCase();
-      if (e.shiftKey && key === 'n') commandId = 'file:new-window';
-      else if (!e.shiftKey && key === 'o') commandId = 'file:open';
-      else if (!e.shiftKey && key === 's') commandId = 'file:save';
-      else if (e.shiftKey && key === 's') commandId = 'file:save-as';
-      else if (!e.shiftKey && key === 'p') commandId = 'file:print';
+      if (e.shiftKey && !e.altKey && key === 'n') commandId = 'file:new-window';
+      else if (!e.shiftKey && e.altKey && key === 'o') commandId = 'file:open-recent';
+      else if (!e.shiftKey && !e.altKey && key === 'o') commandId = 'file:open';
+      else if (!e.shiftKey && !e.altKey && key === 's') commandId = 'file:save';
+      else if (e.shiftKey && !e.altKey && key === 's') commandId = 'file:save-as';
+      else if (!e.shiftKey && !e.altKey && key === 'p') commandId = 'file:print';
 
       if (commandId) {
         e.preventDefault();
@@ -517,6 +536,7 @@ async function initializeDocument(docInfo: DocumentInfo, displayName: string): P
     msg.textContent = displayName;
     totalSections = docInfo.sectionCount ?? 1;
     sbSection().textContent = `구역: 1 / ${totalSections}`;
+    void homeScreen?.refresh(true);
     inputHandler?.deactivate();
     canvasView?.loadDocument();
     toolbar?.setEnabled(true);
