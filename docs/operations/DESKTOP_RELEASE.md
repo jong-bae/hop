@@ -8,14 +8,13 @@ Tauri 데스크톱 앱은 `apps/desktop/`에서 빌드한다. 배포용 GitHub A
 
 ## 워크플로 동작
 
-`HOP Desktop Release`는 두 가지 방식으로 실행된다.
+`HOP Desktop Release`는 수동으로만 실행된다.
 
 | 트리거 | 빌드 플랫폼 | 릴리즈 |
 | --- | --- | --- |
-| 데스크톱/에디터 코드, root pnpm 의존성, 번들 폰트/로고, 관련 문서, upstream submodule pointer를 건드린 Pull Request | Linux x64, Windows x64 | 릴리즈 없음. 스모크 빌드 artifact만 생성 |
 | 수동 `workflow_dispatch` | macOS arm64, macOS x64 기본 선택. Windows x64, Linux x64는 필요할 때 선택 | 선택적으로 draft/prerelease 릴리즈 생성 |
 
-태그 push는 자동 빌드를 실행하지 않는다. 릴리즈 빌드는 GitHub Actions에서 수동으로 실행하고, `build_ref`에 빌드할 branch, tag, commit SHA를 입력한다. `create_release`를 켠 상태에서 `build_ref`를 비워 두면 `release_tag`를 빌드 ref로 사용한다. HOP 데스크톱 릴리즈 태그는 `v*` 네임스페이스를 사용한다.
+Pull Request와 태그 push는 자동 빌드를 실행하지 않는다. 릴리즈 빌드는 GitHub Actions에서 수동으로 실행하고, `build_ref`에 빌드할 branch, tag, commit SHA를 입력한다. `create_release`를 켠 상태에서 `build_ref`를 비워 두면 `release_tag`를 빌드 ref로 사용한다. HOP 데스크톱 릴리즈 태그는 `v*` 네임스페이스를 사용한다.
 
 빌드 대상은 다음과 같다.
 
@@ -198,7 +197,7 @@ Azure Trusted Signing을 쓴다면 보통 다음 secret이 필요하다.
 
 ## Tauri updater 서명
 
-데스크톱 앱은 GitHub Releases의 `latest.json`을 업데이트 endpoint로 사용한다. updater artifact 생성은 일반 PR/로컬 번들 빌드가 signing key를 요구하지 않도록 릴리즈 워크플로에서만 `createUpdaterArtifacts=true` config override로 켠다. 릴리즈 빌드에는 updater private key가 필요하다.
+데스크톱 앱은 GitHub Releases의 `latest.json`을 업데이트 endpoint로 사용한다. updater artifact 생성은 일반 수동/로컬 번들 빌드가 signing key를 요구하지 않도록 릴리즈 워크플로에서만 `createUpdaterArtifacts=true` config override로 켠다. 릴리즈 빌드에는 updater private key가 필요하다.
 
 1. keypair를 만든다.
 
