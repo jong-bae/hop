@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventBus } from '@upstream/core/event-bus';
 
 const renderPageMock = vi.hoisted(() => vi.fn());
+const renderPageParentMock = vi.hoisted(() => vi.fn());
 const viewportState = vi.hoisted(() => ({ width: 1041, height: 900 }));
 const scrollContentState = vi.hoisted(() => ({ width: 1041 }));
 
@@ -99,6 +100,17 @@ vi.mock('@upstream/view/page-renderer', () => ({
   PageRenderer: class MockPageRenderer {
     renderPage(pageIdx: number, canvas: HTMLCanvasElement, scale: number): void {
       renderPageMock(pageIdx, scale);
+      renderPageParentMock(Boolean(canvas.parentElement), canvas.style.left);
+      canvas.width = Math.round(1000 * scale);
+      canvas.height = Math.round(1400 * scale);
+      const parent = canvas.parentElement as unknown as MockNode | null;
+      const overlay = createMockNode();
+      overlay.dataset = { rhwpOverlay: `front-${pageIdx}` };
+      parent?.appendChild(overlay);
+    }
+
+    renderPageFlow(pageIdx: number, canvas: HTMLCanvasElement, scale: number): void {
+      renderPageMock(pageIdx, scale);
       canvas.width = Math.round(1000 * scale);
       canvas.height = Math.round(1400 * scale);
     }
@@ -139,15 +151,18 @@ vi.mock('@upstream/view/coordinate-system', () => ({
 
 import {
   CanvasView,
+} from './canvas-view';
+import {
   applyCanvasDisplayLayout,
   inferCanvasDevicePixelRatio,
-} from './canvas-view';
+} from './canvas-layout';
 
 type MockNode = {
   id?: string;
   style: Record<string, string>;
   children: MockNode[];
   parentElement: MockNode | null;
+  dataset?: Record<string, string>;
   clientWidth: number;
   scrollTop: number;
   innerHTML: string;
@@ -157,6 +172,7 @@ type MockNode = {
   replaceChildren: (...children: MockNode[]) => void;
   remove: () => void;
   querySelector: (selector: string) => MockNode | null;
+  querySelectorAll: (selector: string) => MockNode[];
 };
 
 function createMockNode(id?: string): MockNode {
@@ -199,6 +215,20 @@ function createMockNode(id?: string): MockNode {
         return node.children.find((child) => 'width' in child) ?? null;
       }
       return null;
+    },
+    querySelectorAll(selector) {
+      if (selector === '[data-rhwp-overlay]') {
+        return node.children.filter((child) => child.dataset?.rhwpOverlay);
+      }
+      const overlayIds = Array.from(selector.matchAll(/data-rhwp-overlay="([^"]+)"/g))
+        .map((match) => match[1]);
+      if (overlayIds.length > 0) {
+        return node.children.filter((child) => {
+          const id = child.dataset?.rhwpOverlay;
+          return Boolean(id && overlayIds.includes(id));
+        });
+      }
+      return [];
     },
   };
 
@@ -258,6 +288,7 @@ describe('inferCanvasDevicePixelRatio', () => {
 describe('CanvasView viewport resize behavior', () => {
   beforeEach(() => {
     renderPageMock.mockReset();
+    renderPageParentMock.mockReset();
     viewportState.width = 1041;
     viewportState.height = 900;
     scrollContentState.width = 1041;
@@ -303,6 +334,9 @@ describe('CanvasView viewport resize behavior', () => {
     expect(canvas).not.toBeNull();
     expect(canvas?.style.left).toBe('21px');
     expect(renderPageMock).toHaveBeenCalledTimes(1);
+    expect(renderPageParentMock).toHaveBeenCalledWith(true, '21px');
+    const overlay = scrollContent.querySelectorAll('[data-rhwp-overlay]')[0];
+    expect(overlay?.style.left).toBe('21px');
 
     viewportState.width = 1200;
     scrollContentState.width = 1200;
@@ -312,7 +346,10 @@ describe('CanvasView viewport resize behavior', () => {
     expect(canvas?.style.left).toBe('100px');
     expect(renderPageMock).toHaveBeenCalledTimes(1);
     expect(canvas?.style.width).toBe('1000px');
+    expect(overlay?.style.left).toBe('100px');
 
     view.dispose();
+
+    expect(scrollContent.querySelectorAll('[data-rhwp-overlay]')).toHaveLength(0);
   });
 });
