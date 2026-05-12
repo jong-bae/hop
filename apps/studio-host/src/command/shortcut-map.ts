@@ -8,9 +8,7 @@ export type { ShortcutDef };
 
 const hopShortcuts: [ShortcutDef, string][] = [
   [{ key: 'n', ctrl: true, shift: true }, 'file:new-window'],
-  [{ key: 'o', ctrl: true }, 'file:open'],
   [{ key: 's', ctrl: true, shift: true }, 'file:save-as'],
-  [{ key: 'e', ctrl: true }, 'file:export-pdf'],
   [{ key: 't', ctrl: true, alt: true }, 'table:cell-selection-enter'],
 ];
 

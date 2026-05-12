@@ -18,6 +18,12 @@ describe('shortcut-map', () => {
       .toBe('table:cell-selection-enter');
   });
 
+  it('keeps Ctrl+E mapped to upstream delete instead of PDF export', () => {
+    installNavigator({ platform: 'Win32', userAgent: 'Windows NT 10.0' });
+
+    expect(matchShortcut(keyEvent({ key: 'e', ctrlKey: true }), defaultShortcuts)).toBe('edit:delete');
+  });
+
   it('does not treat Meta as Ctrl on Windows', () => {
     installNavigator({ platform: 'Win32', userAgent: 'Windows NT 10.0' });
 

@@ -53,7 +53,7 @@ export function onClick(this: any, e: MouseEvent): void {
     const cr = sc.getBoundingClientRect();
     const cx = e.clientX - cr.left;
     const cy = e.clientY - cr.top;
-    const pi = this.virtualScroll.getPageAtY(cy);
+    const pi = this.virtualScroll.getPageAtPoint(cx, cy);
     const po = this.virtualScroll.getPageOffset(pi);
     const pl = resolveVirtualScrollPageLeft(this.virtualScroll, pi, sc.clientWidth);
     const pageX = (cx - pl) / zoom;
@@ -158,7 +158,7 @@ export function onClick(this: any, e: MouseEvent): void {
         const cr = sc.getBoundingClientRect();
         const cx = e.clientX - cr.left;
         const cy = e.clientY - cr.top;
-        const pi = this.virtualScroll.getPageAtY(cy);
+        const pi = this.virtualScroll.getPageAtPoint(cx, cy);
         const po = this.virtualScroll.getPageOffset(pi);
         const pl = resolveVirtualScrollPageLeft(this.virtualScroll, pi, sc.clientWidth);
         const px = (cx - pl) / zoom;
@@ -204,7 +204,7 @@ export function onClick(this: any, e: MouseEvent): void {
           const cr = sc.getBoundingClientRect();
           const cx = e.clientX - cr.left;
           const cy = e.clientY - cr.top;
-          const pi = this.virtualScroll.getPageAtY(cy);
+          const pi = this.virtualScroll.getPageAtPoint(cx, cy);
           const po = this.virtualScroll.getPageOffset(pi);
           const pl = resolveVirtualScrollPageLeft(this.virtualScroll, pi, sc.clientWidth);
           const px = (cx - pl) / zoom;
@@ -388,7 +388,7 @@ export function onClick(this: any, e: MouseEvent): void {
             const cr = sc.getBoundingClientRect();
             const cx = e.clientX - cr.left;
             const cy = e.clientY - cr.top;
-            const pi = this.virtualScroll.getPageAtY(cy);
+            const pi = this.virtualScroll.getPageAtPoint(cx, cy);
             const po = this.virtualScroll.getPageOffset(pi);
             const pl = resolveVirtualScrollPageLeft(this.virtualScroll, pi, sc.clientWidth);
             const px = (cx - pl) / zoom;
@@ -449,7 +449,7 @@ export function onClick(this: any, e: MouseEvent): void {
             const contentRect = scrollContent.getBoundingClientRect();
             const contentX = e.clientX - contentRect.left;
             const contentY = e.clientY - contentRect.top;
-            const pageIdx = this.virtualScroll.getPageAtY(contentY);
+            const pageIdx = this.virtualScroll.getPageAtPoint(contentX, contentY);
             const pageOffset = this.virtualScroll.getPageOffset(pageIdx);
             const pageLeft = resolveVirtualScrollPageLeft(
               this.virtualScroll,
@@ -494,7 +494,7 @@ export function onClick(this: any, e: MouseEvent): void {
   const contentY = e.clientY - contentRect.top;
 
   // 페이지 찾기
-  const pageIdx = this.virtualScroll.getPageAtY(contentY);
+  const pageIdx = this.virtualScroll.getPageAtPoint(contentX, contentY);
   const pageOffset = this.virtualScroll.getPageOffset(pageIdx);
 
   const pageLeft = resolveVirtualScrollPageLeft(
@@ -656,7 +656,7 @@ export function onClick(this: any, e: MouseEvent): void {
       this.cursor.resetPreferredX();
       this.cursor.setAnchor();
       this.active = true;
-      this.isDragging = true;
+      this.startTextSelectionDrag(e);
       this.updateCaret();
       document.addEventListener('mouseup', this.onMouseUpBound, { once: true });
       this.textarea.focus();
@@ -702,7 +702,7 @@ export function onClick(this: any, e: MouseEvent): void {
               this.cursor.resetPreferredX();
               this.cursor.setAnchor();
               this.active = true;
-              this.isDragging = true;
+              this.startTextSelectionDrag(e);
               this.updateCaret();
               document.addEventListener('mouseup', this.onMouseUpBound, { once: true });
               this.textarea.focus();
@@ -761,7 +761,7 @@ export function onClick(this: any, e: MouseEvent): void {
     this.cursor.resetPreferredX();
     this.cursor.setAnchor(); // 드래그 시작점(anchor) 설정
     this.active = true;
-    this.isDragging = true;
+    this.startTextSelectionDrag(e);
 
     const rect = this.cursor.getRect();
     if (rect) {
@@ -806,7 +806,7 @@ export function onDblClick(this: any, e: MouseEvent): void {
         const cr = sc.getBoundingClientRect();
         const contentX = e.clientX - cr.left;
         const contentY = e.clientY - cr.top;
-        const pageIdx = this.virtualScroll.getPageAtY(contentY);
+        const pageIdx = this.virtualScroll.getPageAtPoint(contentX, contentY);
         if (pageIdx >= 0) {
           const pageOffset = this.virtualScroll.getPageOffset(pageIdx);
           const pageLeft = resolveVirtualScrollPageLeft(
@@ -892,7 +892,7 @@ export function onContextMenu(this: any, e: MouseEvent): void {
   const contentRect = scrollContent.getBoundingClientRect();
   const contentX = e.clientX - contentRect.left;
   const contentY = e.clientY - contentRect.top;
-  const pageIdx = this.virtualScroll.getPageAtY(contentY);
+  const pageIdx = this.virtualScroll.getPageAtPoint(contentX, contentY);
   const pageOffset = this.virtualScroll.getPageOffset(pageIdx);
   const pageLeft = resolveVirtualScrollPageLeft(
     this.virtualScroll,
@@ -937,7 +937,7 @@ export function onMouseMove(this: any, e: MouseEvent): void {
       const cr = sc.getBoundingClientRect();
       const cx = e.clientX - cr.left;
       const cy = e.clientY - cr.top;
-      const pi = this.virtualScroll.getPageAtY(cy);
+      const pi = this.virtualScroll.getPageAtPoint(cx, cy);
       const po = this.virtualScroll.getPageOffset(pi);
       const pl = resolveVirtualScrollPageLeft(this.virtualScroll, pi, sc.clientWidth);
       const pageX = (cx - pl) / zoom;
@@ -1108,15 +1108,12 @@ export function onMouseMove(this: any, e: MouseEvent): void {
 
   // 드래그 중: requestAnimationFrame으로 throttle하여 성능 확보
   if (this.isDragging) {
+    this.updateTextSelectionDragPointer(e);
     if (this.dragRafId) return; // 이미 예약된 프레임이 있으면 건너뜀
     this.dragRafId = requestAnimationFrame(() => {
       this.dragRafId = 0;
       if (!this.isDragging) return;
-      const hit = this.hitTestFromEvent(e);
-      if (hit && hit.paragraphIndex < 0xFFFFFF00) {
-        this.cursor.moveTo(hit);
-        this.updateCaret();
-      }
+      this.updateTextSelectionDragFromPointer();
     });
     return;
   }
@@ -1151,7 +1148,7 @@ export function onMouseMove(this: any, e: MouseEvent): void {
         const picBbox = this.findPictureBbox(ref);
         if (picBbox) {
           const zoom = this.viewportManager.getZoom();
-          const pi = this.virtualScroll.getPageAtY(y);
+          const pi = this.virtualScroll.getPageAtPoint(x, y);
           const po = this.virtualScroll.getPageOffset(pi);
           const pl = resolveVirtualScrollPageLeft(
             this.virtualScroll,
@@ -1204,7 +1201,7 @@ export function onMouseMove(this: any, e: MouseEvent): void {
       const ref = this.cursor.getSelectedTableRef();
       if (ref) {
         const zoom = this.viewportManager.getZoom();
-        const pi = this.virtualScroll.getPageAtY(y);
+        const pi = this.virtualScroll.getPageAtPoint(x, y);
         const po = this.virtualScroll.getPageOffset(pi);
         const pl = resolveVirtualScrollPageLeft(
           this.virtualScroll,
@@ -1254,7 +1251,7 @@ export function handleResizeHover(this: any, e: MouseEvent): void {
   const contentRect = scrollContent.getBoundingClientRect();
   const contentX = e.clientX - contentRect.left;
   const contentY = e.clientY - contentRect.top;
-  const pageIdx = this.virtualScroll.getPageAtY(contentY);
+  const pageIdx = this.virtualScroll.getPageAtPoint(contentX, contentY);
   const pageOffset = this.virtualScroll.getPageOffset(pageIdx);
   const pageLeft = resolveVirtualScrollPageLeft(
     this.virtualScroll,
@@ -1381,7 +1378,7 @@ export function onMouseUp(this: any, _e: MouseEvent): void {
   }
 
   if (!this.isDragging) return;
-  this.isDragging = false;
+  this.stopTextSelectionDrag();
   if (this.dragRafId) {
     cancelAnimationFrame(this.dragRafId);
     this.dragRafId = 0;
@@ -1401,7 +1398,7 @@ export function onMouseUp(this: any, _e: MouseEvent): void {
     }
   }
 
-  this.updateCaret();
+  this.updateCaret(true);
 }
 
 

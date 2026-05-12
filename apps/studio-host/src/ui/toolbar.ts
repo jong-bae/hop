@@ -280,6 +280,26 @@ export class Toolbar {
     });
   }
 
+  /** 문서 로드 시 글꼴 드롭다운을 기본/문서/대표/로컬 글꼴로 재구성한다. */
+  initFontDropdown(docFonts?: string[]): void {
+    this.beginFontApplyRequest();
+    this.lastFontFamilies = undefined;
+    const baseFonts = ['함초롬바탕', '함초롬돋움', '맑은 고딕', '나눔고딕', '바탕', '돋움', '궁서'];
+    this.fontName.replaceChildren();
+    const seen = new Set<string>();
+    for (const name of [...baseFonts, ...(docFonts ?? [])]) {
+      if (seen.has(name)) continue;
+      const option = document.createElement('option');
+      option.value = name;
+      option.textContent = name;
+      this.fontName.appendChild(option);
+      seen.add(name);
+    }
+    this.populateFontSetOptions();
+    this.populateLocalFontOptions();
+    syncCustomSelect(this.fontName);
+  }
+
   /** 글자색 피커 이벤트 */
   private setupColorPicker(): void {
     this.btnTextColor.addEventListener('mousedown', (e) => {

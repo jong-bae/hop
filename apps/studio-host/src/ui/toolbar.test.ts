@@ -200,4 +200,39 @@ describe('Toolbar font application sequencing', () => {
       fontIds: [1000, 1001, 1002, 1003, 1004, 1005, 1006],
     });
   });
+
+  it('invalidates pending font applications when rebuilding the font dropdown for a new document', () => {
+    const previousDocument = globalThis.document;
+    const replaceChildren = vi.fn();
+    const appendChild = vi.fn();
+    const toolbar = {
+      fontApplyRequestId: 7,
+      lastFontFamilies: ['Old', 'Fonts'],
+      fontName: {
+        replaceChildren,
+        appendChild,
+      },
+      populateFontSetOptions: vi.fn(),
+      populateLocalFontOptions: vi.fn(),
+      beginFontApplyRequest: (
+        Toolbar.prototype as unknown as Record<string, () => number>
+      ).beginFontApplyRequest,
+    };
+    const createElement = vi.fn(() => ({ value: '', textContent: '' }));
+    (globalThis as { document?: unknown }).document = { createElement };
+    const initFontDropdown = (
+      Toolbar.prototype as unknown as Record<string, (this: object, docFonts?: string[]) => void>
+    ).initFontDropdown;
+
+    try {
+      initFontDropdown.call(toolbar, ['DocFont']);
+
+      expect(toolbar.fontApplyRequestId).toBe(8);
+      expect(toolbar.lastFontFamilies).toBeUndefined();
+      expect(replaceChildren).toHaveBeenCalledOnce();
+      expect(appendChild).toHaveBeenCalledWith(expect.objectContaining({ value: 'DocFont' }));
+    } finally {
+      (globalThis as { document?: unknown }).document = previousDocument;
+    }
+  });
 });

@@ -5,6 +5,7 @@ interface FontEntry {
   name: string;
   file: string;
   format?: 'woff2' | 'woff';
+  unicodeRange?: string;
 }
 
 const FONT_LIST: FontEntry[] = [
@@ -68,6 +69,7 @@ const FONT_LIST: FontEntry[] = [
   { name: 'Cafe24 Ssurround Bold', file: '/fonts/Cafe24Ssurround-v2.0.woff2' },
   { name: '카페24 슈퍼매직', file: '/fonts/Cafe24Supermagic-Regular-v1.0.woff2' },
   { name: 'Cafe24 Supermagic', file: '/fonts/Cafe24Supermagic-Regular-v1.0.woff2' },
+  { name: 'Latin Modern Math', file: '/fonts/LatinModernMath-Regular.woff2' },
   { name: 'SpoqaHanSans', file: '/fonts/SpoqaHanSans-Regular.woff2' },
   { name: '고운바탕', file: '/fonts/GowunBatang-Regular.woff2' },
   { name: '고운돋움', file: '/fonts/GowunDodum-Regular.woff2' },
@@ -120,7 +122,11 @@ export async function loadWebFonts(
   for (const font of toLoad) {
     try {
       for (const name of fileToNames.get(font.file) ?? [font.name]) {
-        const face = new FontFace(name, `url("${font.file}") format("${font.format ?? 'woff2'}")`);
+        const face = new FontFace(
+          name,
+          `url("${font.file}") format("${font.format ?? 'woff2'}")`,
+          font.unicodeRange ? { unicodeRange: font.unicodeRange } : undefined,
+        );
         document.fonts.add(await face.load());
       }
       loadedFiles.add(font.file);
@@ -189,7 +195,10 @@ function syncRegisteredFontFaces(): void {
 
   substituteFontStyle.textContent = FONT_LIST
     .filter((font) => !detectedOSFonts.has(font.name))
-    .map((font) => `@font-face { font-family: "${font.name}"; src: url("${font.file}") format("${font.format ?? 'woff2'}"); font-display: swap; }`)
+    .map((font) => {
+      const unicodeRange = font.unicodeRange ? ` unicode-range: ${font.unicodeRange};` : '';
+      return `@font-face { font-family: "${font.name}"; src: url("${font.file}") format("${font.format ?? 'woff2'}"); font-display: swap;${unicodeRange} }`;
+    })
     .join('\n');
 }
 

@@ -91,6 +91,10 @@ describe('file command desktop overrides', () => {
 
     expect(globalThis.alert).toHaveBeenCalledWith('PDF 내보내기는 HOP 데스크톱 앱에서 지원합니다.');
   });
+
+  it('does not expose a PDF export shortcut label', () => {
+    expect(command('file:export-pdf').shortcutLabel).toBeUndefined();
+  });
 });
 
 function command(id: string) {

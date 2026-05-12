@@ -59,8 +59,9 @@ let ruler: Ruler | null = null;
 const registry = new CommandRegistry();
 
 function getContext(): EditorContext {
+  const hasDocument = wasm.pageCount > 0;
   return {
-    hasDocument: wasm.pageCount > 0,
+    hasDocument,
     hasSelection: inputHandler?.hasSelection() ?? false,
     inTable: inputHandler?.isInTable() ?? false,
     inCellSelectionMode: inputHandler?.isInCellSelectionMode() ?? false,
@@ -72,6 +73,7 @@ function getContext(): EditorContext {
     canRedo: inputHandler?.canRedo() ?? false,
     zoom: canvasView?.getViewportManager().getZoom() ?? 1.0,
     showControlCodes: wasm.getShowControlCodes(),
+    sourceFormat: hasDocument ? (wasm.getSourceFormat() as 'hwp' | 'hwpx') : undefined,
   };
 }
 
@@ -280,7 +282,6 @@ function setupGlobalShortcuts(): void {
       else if (!e.shiftKey && key === 'o') commandId = 'file:open';
       else if (!e.shiftKey && key === 's') commandId = 'file:save';
       else if (e.shiftKey && key === 's') commandId = 'file:save-as';
-      else if (!e.shiftKey && key === 'e') commandId = 'file:export-pdf';
       else if (!e.shiftKey && key === 'p') commandId = 'file:print';
 
       if (commandId) {
@@ -519,6 +520,7 @@ async function initializeDocument(docInfo: DocumentInfo, displayName: string): P
     inputHandler?.deactivate();
     canvasView?.loadDocument();
     toolbar?.setEnabled(true);
+    toolbar?.initFontDropdown(docInfo.fontsUsed);
     toolbar?.initStyleDropdown();
     inputHandler?.activateWithCaretPosition();
 

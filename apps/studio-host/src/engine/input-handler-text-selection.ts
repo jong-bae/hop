@@ -120,15 +120,19 @@ function resolveTextHitAtPointer(this: any, e: MouseEvent): { hit: any } | null 
   const contentRect = scrollContent.getBoundingClientRect();
   const contentX = e.clientX - contentRect.left;
   const contentY = e.clientY - contentRect.top;
-  const pageIdx = this.virtualScroll.getPageAtY(contentY);
+  const pageIdx = typeof this.virtualScroll.getPageAtPoint === 'function'
+    ? this.virtualScroll.getPageAtPoint(contentX, contentY)
+    : this.virtualScroll.getPageAtY(contentY);
   if (pageIdx < 0) return null;
 
   const pageOffset = this.virtualScroll.getPageOffset(pageIdx);
-  const pageLeft = resolveVirtualScrollPageLeft(
-    this.virtualScroll,
-    pageIdx,
-    (scrollContent as HTMLElement).clientWidth,
-  );
+  const pageLeft = typeof this.virtualScroll.getPageLeftResolved === 'function'
+    ? this.virtualScroll.getPageLeftResolved(pageIdx, (scrollContent as HTMLElement).clientWidth)
+    : resolveVirtualScrollPageLeft(
+      this.virtualScroll,
+      pageIdx,
+      (scrollContent as HTMLElement).clientWidth,
+    );
   const pageX = (contentX - pageLeft) / zoom;
   const pageY = (contentY - pageOffset) / zoom;
 
