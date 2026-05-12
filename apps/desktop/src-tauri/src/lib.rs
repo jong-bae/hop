@@ -4,6 +4,8 @@ mod font_catalog;
 #[cfg(target_os = "linux")]
 mod linux_runtime;
 #[cfg(target_os = "macos")]
+mod macos_recent_documents;
+#[cfg(target_os = "macos")]
 mod menu;
 mod pdf_export;
 mod pdf_font_fallbacks;
@@ -35,7 +37,7 @@ use updates::{get_update_state, restart_to_apply_update, start_update_install};
 
 pub fn run() {
     #[cfg(target_os = "linux")]
-    linux_runtime::apply_linux_appimage_runtime_fixes();
+    linux_runtime::apply_linux_runtime_fixes();
 
     let app = tauri::Builder::default()
         .enable_macos_default_menu(false)

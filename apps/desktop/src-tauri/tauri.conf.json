@@ -55,7 +55,12 @@
         "description": "Hangul Word Processor XML document",
         "mimeType": "application/vnd.hancom.hwpx"
       }
-    ]
+    ],
+    "windows": {
+      "wix": {
+        "template": "windows/main.wxs"
+      }
+    }
   },
   "plugins": {
     "updater": {
