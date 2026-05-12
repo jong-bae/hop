@@ -36,6 +36,8 @@ test('HOP preserves upstream lineseg validation and auto-reflow on document load
   const mainSource = await readFile(join(repoRoot, 'apps/studio-host/src/main.ts'), 'utf8');
 
   assert.match(mainSource, /showValidationModalIfNeeded/);
+  assert.match(mainSource, /currentSourceFormat/);
+  assert.match(mainSource, /sourceFormat\s*===\s*['"]hwpx['"]/);
   assert.match(mainSource, /wasm\.getValidationWarnings\(\)/);
   assert.match(mainSource, /wasm\.reflowLinesegs\(\)/);
   assert.match(mainSource, /canvasView\?\.loadDocument\(\)/);
