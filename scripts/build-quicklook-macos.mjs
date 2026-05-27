@@ -24,27 +24,21 @@ const swiftTarget = target === 'x86_64-apple-darwin'
   : 'aarch64-apple-macosx12.0';
 const releaseDir = join(rustRoot, 'target', target, 'release');
 const staticLib = join(releaseDir, 'libhop_quicklook_ffi.a');
-const previewStaticLib = join(libDir, 'libhop_quicklook_preview.a');
-const thumbnailStaticLib = join(libDir, 'libhop_quicklook_thumbnail.a');
+const stagedStaticLib = join(libDir, 'libhop_quicklook_ffi.a');
 
 rmSync(stagingRoot, { recursive: true, force: true });
 mkdirSync(plugInsDir, { recursive: true });
 mkdirSync(libDir, { recursive: true });
 
 buildRustStaticLibrary({
-  features: [],
-  output: previewStaticLib,
-});
-
-buildRustStaticLibrary({
   features: ['native-skia'],
-  output: thumbnailStaticLib,
+  output: stagedStaticLib,
 });
 
 buildExtension({
   moduleName: 'HopQuickLookPreview',
   appexName: 'HopQuickLookPreview.appex',
-  staticLib: previewStaticLib,
+  staticLib: stagedStaticLib,
   infoPlist: join(quicklookRoot, 'Resources/Preview/Info.plist'),
   sources: [
     join(quicklookRoot, 'Sources/Shared/HopQuickLookFFI.swift'),
@@ -64,7 +58,7 @@ buildExtension({
 buildExtension({
   moduleName: 'HopQuickLookThumbnail',
   appexName: 'HopQuickLookThumbnail.appex',
-  staticLib: thumbnailStaticLib,
+  staticLib: stagedStaticLib,
   infoPlist: join(quicklookRoot, 'Resources/Thumbnail/Info.plist'),
   sources: [
     join(quicklookRoot, 'Sources/Shared/HopQuickLookFFI.swift'),

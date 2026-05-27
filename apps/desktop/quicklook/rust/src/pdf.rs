@@ -1,7 +1,36 @@
+use base64::Engine;
 use pdf_writer::{Finish, Pdf, Ref};
 use std::collections::HashMap;
 
-pub(crate) fn svgs_to_pdf(svg_pages: &[String]) -> Result<Vec<u8>, String> {
+pub(crate) fn png_pages_to_pdf(pages: Vec<PngPage>) -> Result<Vec<u8>, String> {
+    let svg_pages = pages
+        .into_iter()
+        .map(PngPage::into_svg)
+        .collect::<Result<Vec<_>, _>>()?;
+    svgs_to_pdf(&svg_pages)
+}
+
+pub(crate) struct PngPage {
+    pub png: Vec<u8>,
+    pub width: f64,
+    pub height: f64,
+}
+
+impl PngPage {
+    fn into_svg(self) -> Result<String, String> {
+        if self.png.is_empty() || self.width <= 0.0 || self.height <= 0.0 {
+            return Err("invalid png page".to_string());
+        }
+        let encoded = base64::engine::general_purpose::STANDARD.encode(&self.png);
+        Ok(format!(
+            r#"<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}"><image width="{width}" height="{height}" href="data:image/png;base64,{encoded}"/></svg>"#,
+            width = self.width,
+            height = self.height,
+        ))
+    }
+}
+
+fn svgs_to_pdf(svg_pages: &[String]) -> Result<Vec<u8>, String> {
     if svg_pages.is_empty() {
         return Err("empty pages".to_string());
     }
@@ -23,8 +52,8 @@ pub(crate) fn svgs_to_pdf(svg_pages: &[String]) -> Result<Vec<u8>, String> {
     let mut page_datas = Vec::with_capacity(svg_pages.len());
     for svg in svg_pages {
         let tree = parse_svg_tree(svg).map_err(|error| error.to_string())?;
-        let (chunk, svg_ref) = svg2pdf::to_chunk(&tree, conversion_options())
-            .map_err(|error| format!("{error:?}"))?;
+        let (chunk, svg_ref) =
+            svg2pdf::to_chunk(&tree, conversion_options()).map_err(|error| format!("{error:?}"))?;
         let dpi_ratio = 72.0 / 96.0;
         page_datas.push(PageData {
             chunk,
@@ -65,7 +94,9 @@ pub(crate) fn svgs_to_pdf(svg_pages: &[String]) -> Result<Vec<u8>, String> {
         page.parent(page_tree_ref);
         page.contents(content_ref);
         let mut resources = page.resources();
-        resources.x_objects().pair(svg_name, renumbered_svg_refs[idx]);
+        resources
+            .x_objects()
+            .pair(svg_name, renumbered_svg_refs[idx]);
         resources.finish();
         page.finish();
 

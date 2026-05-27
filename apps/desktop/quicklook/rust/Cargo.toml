@@ -9,6 +9,7 @@ name = "hop_quicklook_ffi"
 crate-type = ["staticlib", "rlib"]
 
 [dependencies]
+base64 = "0.22"
 pdf-writer = "0.12"
 rhwp = { path = "../../../../third_party/rhwp" }
 serde_json = "1"

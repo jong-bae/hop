@@ -15,6 +15,7 @@ const HOP_QL_PARSE_FAILED: i32 = 2;
 const HOP_QL_EMPTY_DOCUMENT: i32 = 3;
 const HOP_QL_RENDER_FAILED: i32 = 4;
 const HOP_QL_NO_THUMBNAIL: i32 = 5;
+const PREVIEW_MAX_PIXEL_DIMENSION: u32 = 2048;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -43,6 +44,7 @@ pub struct HopQuickLookThumbnailResult {
 }
 
 #[no_mangle]
+#[cfg(feature = "native-skia")]
 pub extern "C" fn hop_ql_render_preview_pdf(
     data: *const u8,
     len: usize,
@@ -54,15 +56,21 @@ pub extern "C" fn hop_ql_render_preview_pdf(
         if page_count == 0 {
             return Err(HOP_QL_EMPTY_DOCUMENT);
         }
-        let mut svg_pages = Vec::with_capacity(page_count as usize);
+        let mut png_pages = Vec::with_capacity(page_count as usize);
+        let mut first_page_dimensions = None;
         for page in 0..page_count {
-            svg_pages.push(
-                core.render_page_svg_native(page)
-                    .map_err(|_| HOP_QL_RENDER_FAILED)?,
-            );
+            let (width, height) = page_size(&core, page)?;
+            if page == 0 {
+                first_page_dimensions = Some((width, height));
+            }
+            png_pages.push(pdf::PngPage {
+                png: render_page_png(&core, page, Some(PREVIEW_MAX_PIXEL_DIMENSION))?,
+                width,
+                height,
+            });
         }
-        let (width, height) = first_page_size(&core)?;
-        let pdf = pdf::svgs_to_pdf(&svg_pages).map_err(|_| HOP_QL_RENDER_FAILED)?;
+        let (width, height) = first_page_dimensions.ok_or(HOP_QL_RENDER_FAILED)?;
+        let pdf = pdf::png_pages_to_pdf(png_pages).map_err(|_| HOP_QL_RENDER_FAILED)?;
         Ok(HopQuickLookRenderResult {
             status: HOP_QL_OK,
             bytes: owned_bytes(pdf),
@@ -71,6 +79,15 @@ pub extern "C" fn hop_ql_render_preview_pdf(
             height,
         })
     })
+}
+
+#[no_mangle]
+#[cfg(not(feature = "native-skia"))]
+pub extern "C" fn hop_ql_render_preview_pdf(
+    _data: *const u8,
+    _len: usize,
+) -> HopQuickLookRenderResult {
+    render_error(HOP_QL_RENDER_FAILED)
 }
 
 #[no_mangle]
@@ -87,21 +104,8 @@ pub extern "C" fn hop_ql_render_first_page_png(
         if page_count == 0 {
             return Err(HOP_QL_EMPTY_DOCUMENT);
         }
-        let (width, height) = first_page_size(&core)?;
-        let options = PngExportOptions {
-            scale: None,
-            max_dimension: if max_dimension == 0 {
-                None
-            } else {
-                Some(max_dimension.min(i32::MAX as u32) as i32)
-            },
-            vlm_target: None,
-            dpi: None,
-            font_paths: Vec::new(),
-        };
-        let png = core
-            .render_page_png_native_with_export_options(0, &options)
-            .map_err(|_| HOP_QL_RENDER_FAILED)?;
+        let (width, height) = page_size(&core, 0)?;
+        let png = render_page_png(&core, 0, (max_dimension != 0).then_some(max_dimension))?;
         Ok(HopQuickLookRenderResult {
             status: HOP_QL_OK,
             bytes: owned_bytes(png),
@@ -232,12 +236,28 @@ fn thumbnail_error(status: i32) -> HopQuickLookThumbnailResult {
     }
 }
 
-fn first_page_size(core: &DocumentCore) -> Result<(f64, f64), i32> {
+#[cfg(feature = "native-skia")]
+fn render_page_png(
+    core: &DocumentCore,
+    page: u32,
+    max_dimension: Option<u32>,
+) -> Result<Vec<u8>, i32> {
+    let options = PngExportOptions {
+        scale: None,
+        max_dimension: max_dimension.map(|value| value.min(i32::MAX as u32) as i32),
+        vlm_target: None,
+        dpi: None,
+        font_paths: Vec::new(),
+    };
+    core.render_page_png_native_with_export_options(page, &options)
+        .map_err(|_| HOP_QL_RENDER_FAILED)
+}
+
+fn page_size(core: &DocumentCore, page: u32) -> Result<(f64, f64), i32> {
     let raw = core
-        .get_page_info_native(0)
+        .get_page_info_native(page)
         .map_err(|_| HOP_QL_RENDER_FAILED)?;
-    let value: serde_json::Value =
-        serde_json::from_str(&raw).map_err(|_| HOP_QL_RENDER_FAILED)?;
+    let value: serde_json::Value = serde_json::from_str(&raw).map_err(|_| HOP_QL_RENDER_FAILED)?;
     let width = value
         .get("width")
         .and_then(|v| v.as_f64())

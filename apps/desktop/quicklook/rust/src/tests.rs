@@ -38,6 +38,8 @@ fn renders_sample_preview_pdf() {
     assert!(result.page_count > 0);
     assert!(result.bytes.len > 0);
     assert!(!result.bytes.ptr.is_null());
+    let pdf = unsafe { std::slice::from_raw_parts(result.bytes.ptr, result.bytes.len) };
+    assert!(pdf.starts_with(b"%PDF-"));
     unsafe {
         hop_ql_free_bytes(result.bytes.ptr, result.bytes.len);
     }
