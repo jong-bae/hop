@@ -468,7 +468,10 @@ jobs:
 
       - name: Clear stale bundle outputs
         shell: bash
-        run: find apps/desktop/src-tauri/target -type d -name bundle -prune -exec rm -rf {} +
+        run: |
+          if [[ -d apps/desktop/src-tauri/target ]]; then
+            find apps/desktop/src-tauri/target -type d -name bundle -prune -exec rm -rf {} +
+          fi
 
       - name: Resolve Tauri build args
         id: tauri-build-args
