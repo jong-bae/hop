@@ -38,6 +38,11 @@ on:
         required: false
         default: true
         type: boolean
+      notarize_macos:
+        description: Sign and notarize macOS artifacts for manual testing
+        required: false
+        default: false
+        type: boolean
       create_release:
         description: Create or update a GitHub draft release
         required: false
@@ -319,9 +324,9 @@ jobs:
         if: github.event_name != 'workflow_dispatch' || inputs.run_tests == true
         run: pnpm test
 
-      - name: Validate macOS release signing secrets
+      - name: Validate macOS signing secrets
         id: macos-signing
-        if: runner.os == 'macOS' && needs.prepare.outputs.create_release == 'true'
+        if: runner.os == 'macOS' && (needs.prepare.outputs.create_release == 'true' || inputs.notarize_macos == true)
         shell: bash
         run: |
           set -euo pipefail
