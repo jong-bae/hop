@@ -28,19 +28,9 @@ pub fn clear_documents(app: &AppHandle) -> Result<(), String> {
 }
 
 pub fn record_document(app: &AppHandle, path: &Path) -> Result<(), String> {
-    if record_document_at(&store_path(app)?, path)? {
-        note_platform_recent_document(app, path);
-    }
+    record_document_at(&store_path(app)?, path)?;
     Ok(())
 }
-
-#[cfg(target_os = "macos")]
-fn note_platform_recent_document(app: &AppHandle, path: &Path) {
-    let _ = crate::macos_recent_documents::note_recent_document(app, path);
-}
-
-#[cfg(not(target_os = "macos"))]
-fn note_platform_recent_document(_app: &AppHandle, _path: &Path) {}
 
 fn store_path(app: &AppHandle) -> Result<PathBuf, String> {
     let dir = app

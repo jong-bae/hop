@@ -123,6 +123,7 @@ export class TauriBridge extends WasmBridge implements DesktopBridgeApi {
     try {
       const info = super.loadDocument(bytes, result.fileName);
       this.applyNativeOpenResult(result, this.normalizedSourceFormat(super.getSourceFormat()));
+      await this.noteFinderRecentDocument(path);
       await this.recordRecentDocument(path);
       await this.closeReplacedDocument(previousDocId, result.docId);
       return {
@@ -284,6 +285,12 @@ export class TauriBridge extends WasmBridge implements DesktopBridgeApi {
     });
   }
 
+  private async noteFinderRecentDocument(path: string): Promise<void> {
+    await this.invoke<void>('note_finder_recent_document', { path }).catch((error: unknown) => {
+      console.warn('[TauriBridge] Finder recent document update failed:', error);
+    });
+  }
+
   private async closeReplacedDocument(previousDocId: string | null, nextDocId: string): Promise<void> {
     if (previousDocId && previousDocId !== nextDocId) {
       await this.closeNativeDocument(previousDocId);
@@ -338,6 +345,7 @@ export class TauriBridge extends WasmBridge implements DesktopBridgeApi {
         allowExternalOverwrite,
       });
       this.applyNativeSaveResult(result);
+      await this.noteFinderRecentDocument(finalPath);
       return result;
     } finally {
       await remove(stagedPath).catch(() => undefined);

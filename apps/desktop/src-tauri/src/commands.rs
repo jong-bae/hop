@@ -150,11 +150,33 @@ pub fn record_recent_document(app: AppHandle, path: String) -> Result<(), String
 }
 
 #[tauri::command]
+pub fn note_finder_recent_document(app: AppHandle, path: String) -> Result<(), String> {
+    let path = PathBuf::from(path);
+    ensure_document_open_path(&path)?;
+    note_platform_recent_document(&app, &path)
+}
+
+#[cfg(target_os = "macos")]
+fn note_platform_recent_document(app: &AppHandle, path: &Path) -> Result<(), String> {
+    crate::macos_recent_documents::note_recent_document(app, path)
+}
+
+#[cfg(not(target_os = "macos"))]
+fn note_platform_recent_document(_app: &AppHandle, _path: &Path) -> Result<(), String> {
+    Ok(())
+}
+
+#[tauri::command]
 pub fn render_document_preview(path: String) -> Result<String, String> {
     let path = PathBuf::from(path);
     ensure_document_open_path(&path)?;
-    let bytes = std::fs::read(&path)
-        .map_err(|e| format!("미리보기용 문서를 읽을 수 없습니다: {} ({})", path.display(), e))?;
+    let bytes = std::fs::read(&path).map_err(|e| {
+        format!(
+            "미리보기용 문서를 읽을 수 없습니다: {} ({})",
+            path.display(),
+            e
+        )
+    })?;
     let core = editable_core_from_bytes(&bytes, "문서 파싱 실패", "미리보기용 문서 변환 실패")?;
     core.render_page_svg_native(0)
         .map_err(|e| format!("문서 미리보기를 렌더링할 수 없습니다: {}", e))

@@ -88,6 +88,9 @@ describe('TauriBridge', () => {
         contentHash: hashBytes(new Uint8Array([10, 20, 30])),
       },
     });
+    expect(invokeMock).toHaveBeenCalledWith('note_finder_recent_document', {
+      path: '/tmp/opened.hwp',
+    });
     expect(invokeMock).toHaveBeenCalledWith('record_recent_document', {
       path: '/tmp/opened.hwp',
     });
@@ -166,6 +169,7 @@ describe('TauriBridge', () => {
       .mockResolvedValueOnce(readHandle([2]));
     invokeMock.mockImplementation(async (command: string, args: Record<string, unknown>) => {
       if (command === 'prepare_document_open') return undefined;
+      if (command === 'note_finder_recent_document') return undefined;
       if (command === 'record_recent_document') return undefined;
       if (command === 'close_document') return undefined;
       if (command === 'open_document_tracking') {
@@ -240,6 +244,8 @@ describe('TauriBridge', () => {
           format: 'hwp',
         });
       }
+      if (command === 'note_finder_recent_document') return undefined;
+      if (command === 'record_recent_document') return undefined;
       if (command === 'close_document') return undefined;
       throw new Error(`unexpected command ${command}`);
     });
@@ -266,6 +272,7 @@ describe('TauriBridge', () => {
           format: 'hwp',
         });
       }
+      if (command === 'note_finder_recent_document') return undefined;
       if (command === 'record_recent_document') return undefined;
       throw new Error(`unexpected command ${command}`);
     });
@@ -395,6 +402,7 @@ describe('TauriBridge', () => {
           warnings: [],
         };
       }
+      if (command === 'note_finder_recent_document') return undefined;
       throw new Error(`unexpected command ${command}`);
     });
 
@@ -414,6 +422,9 @@ describe('TauriBridge', () => {
     );
     expect(statMock).toHaveBeenCalledWith('/tmp/report.hwp.hop-save-1234abcd.tmp');
     expect(removeMock).toHaveBeenCalledWith('/tmp/report.hwp.hop-save-1234abcd.tmp');
+    expect(invokeMock).toHaveBeenCalledWith('note_finder_recent_document', {
+      path: '/tmp/report.hwp',
+    });
     expect(result?.sourcePath).toBe('/tmp/report.hwp');
     expect(result?.revision).toBe(6);
     expect(bridge.hasUnsavedChanges()).toBe(false);
@@ -452,6 +463,7 @@ describe('TauriBridge', () => {
           warnings: [],
         };
       }
+      if (command === 'note_finder_recent_document') return undefined;
       throw new Error(`unexpected command ${command}`);
     });
 
