@@ -484,10 +484,43 @@ jobs:
       - name: Build Tauri bundle
         id: tauri
         uses: tauri-apps/tauri-action@v0.6.2
+        env:
+          HOP_MACOS_TARGET: ${{ matrix.target }}
         with:
           projectPath: apps/desktop
           tauriScript: pnpm tauri
           args: ${{ steps.tauri-build-args.outputs.args }}
+
+      - name: Verify macOS Quick Look extensions
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          app_path="$(find apps/desktop/src-tauri/target -path '*/bundle/macos/*.app' -type d | head -n 1)"
+          if [[ -z "$app_path" ]]; then
+            echo "::error::Unable to locate macOS .app bundle after build."
+            exit 1
+          fi
+
+          for extension in HopQuickLookPreview.appex HopQuickLookThumbnail.appex; do
+            if [[ ! -d "$app_path/Contents/PlugIns/$extension" ]]; then
+              echo "::error::Missing Quick Look extension: $app_path/Contents/PlugIns/$extension"
+              exit 1
+            fi
+            codesign --verify --deep --strict "$app_path/Contents/PlugIns/$extension"
+            if ! codesign -d --entitlements :- "$app_path/Contents/PlugIns/$extension" 2>/dev/null \
+              | grep -q '<key>com.apple.security.app-sandbox</key><true/>'; then
+              echo "::error::Quick Look extension is missing app sandbox entitlement: $extension"
+              exit 1
+            fi
+          done
+
+          if [[ "${{ env.HAS_APPLE_CERTIFICATE }}" == "true" ]]; then
+            codesign --verify --deep --strict "$app_path"
+          else
+            echo "::notice::Skipping macOS codesign verification because APPLE_CERTIFICATE is not configured for this build."
+          fi
 
       - name: Verify Linux ABI baseline
         if: runner.os == 'Linux'
